@@ -1,0 +1,47 @@
+trigger: none
+
+pool: ASP.NET-Performance-Controller-new
+
+variables:
+  - group: 'ASP.NET Benchmarks'
+
+schedules:
+- cron: "0 22 * * *"
+  displayName: "On :00"
+  branches:
+    include:
+    - main
+  always: "true" # whether to always run the pipeline or only if there have been source code changes since the last successful scheduled run. The default is false.
+
+
+jobs:
+- job: Benchmark
+  timeoutInMinutes: 60
+  steps:
+  - powershell: |
+        Invoke-WebRequest -Uri "https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.ps1" -OutFile "dotnet-install.ps1"
+        .\dotnet-install.ps1 -version 6.0.101
+
+        git clone https://github.com/dotnet/crank -b main
+        cd .\crank\src\Microsoft.Crank.AzureDevOpsWorker
+        dotnet publish -c release -o build -r win-x64 --self-contained true --framework net6.0
+
+        ./build/crank-azdo.exe.exe `
+            --repository https://github.com/Azure/azure-functions-host `
+            --config https://raw.githubusercontent.com/aspnet/Benchmarks/main/build/prbenchmarks.aspnetcore.config.yml `
+            --app-id $(github.appid) `
+            --install-id $(github.installid) `
+            --app-key "env:APP_KEY" `
+            --publish-results true
+
+        ./build/crank-pr.exe `
+            --repository https://github.com/dotnet/efcore `
+            --config https://raw.githubusercontent.com/aspnet/Benchmarks/main/build/prbenchmarks.efcore.config.yml `
+            --app-id $(github.appid) `
+            --install-id $(github.installid) `
+            --app-key "env:APP_KEY" `
+            --publish-results true
+
+    env:
+        AZURE_RELAY: $(relay.connectionstring)
+        APP_KEY: $(github.privatekey)

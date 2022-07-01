@@ -1,0 +1,30 @@
+trigger: none
+
+schedules:
+- cron: "0 22 * * *"
+  displayName: "On :00"
+  branches:
+    include:
+    - main
+  always: "true" 
+
+
+jobs:
+- job: Benchmark
+  timeoutInMinutes: 60
+  steps:
+  - powershell: |
+        Invoke-WebRequest -Uri "https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.ps1" -OutFile "dotnet-install.ps1"
+        .\dotnet-install.ps1 -version 6.0.101
+
+        git clone https://github.com/dotnet/crank -b main
+        cd .\crank\src\Microsoft.Crank.AzureDevOpsWorker
+        dotnet publish -c release -o build -r win-x64 --self-contained true --framework net6.0
+
+        ./build/crank-azdo.exe.exe `
+            --repository https://github.com/Azure/azure-functions-host `
+            --config https://raw.githubusercontent.com/aspnet/Benchmarks/main/build/prbenchmarks.aspnetcore.config.yml `
+            --queue "env:QUEUE" `
+
+    env:
+        QUEUE: $(github.queueconnectionstring))

@@ -1,0 +1,76 @@
+imports:
+  - https://raw.githubusercontent.com/dotnet/crank/main/src/Microsoft.Crank.Jobs.Bombardier/bombardier.yml
+  - https://raw.githubusercontent.com/dotnet/crank/main/src/Microsoft.Crank.Jobs.Wrk/wrk.yml
+  - https://github.com/aspnet/Benchmarks/blob/main/scenarios/aspnet.profiles.yml?raw=true
+
+  # calculates the allocations per request by using results from application and load
+defaultScript:
+  - |
+    var allocations = benchmarks.jobs.application.results["runtime-counter/alloc-rate"]
+    var rps = benchmarks.jobs.load.results["http/requests"];
+    benchmarks.jobs.application.results["runtime-counter/alloc-per-request"] = allocations / rps;  
+
+results: # creates results from measurements
+- name: runtime-counter/alloc-rate/avg
+  measurement: runtime-counter/alloc-rate
+  description: Avg Allocation Rate (B/sec)
+  format: n0
+  aggregate: avg
+  reduce: sum
+- name: runtime-counter/alloc-rate/p90
+  measurement: runtime-counter/alloc-rate
+  description: 90th Allocation Rate (B/sec)
+  format: n0
+  aggregate: percentile90
+  reduce: sum
+- name: runtime-counter/allow-per-request
+  measurement: alloc-per-request
+  description: Avg Allocations (/request)
+  format: n0
+  aggregate: max
+  reduce: max
+
+jobs:
+  server:
+    source:
+      #localFolder: D:\Repos\azure-functions-host\src\WebJobs.Script.WebHost
+      repository: https://github.com/Azure/azure-functions-host
+      branchOrCommit: dev
+      project: src/WebJobs.Script.WebHost/WebJobs.Script.WebHost.csproj
+    readyStateText: Application started.
+    arguments: "--urls http://*:5000"
+
+    cpuSet: "0-1" # Unboounded is 28    
+    environmentVariables:
+      AzureWebJobsSecretStorageType: Files
+      AzureWebJobsScriptRoot: ../../../sample/Python
+    options:
+      collectCounters: true
+      # counterProviders:
+      #   - System.Runtime
+      #   - Microsoft-AspNetCore-Server-Kestrel
+      #   - Microsoft.AspNetCore.Hosting
+      displayBuild: true
+      displayOutput: true
+    buildArguments: 
+      - "/p:PublishReadyToRun=false"
+
+  wrk:
+    variables:
+      duration: 60
+      connections: 100
+    
+
+scenarios:
+  functions-baseline:
+    application:
+      job: server
+      source:
+        branchOrCommit: dev
+
+    load:
+      job: bombardier
+      variables:
+        #https: true
+        serverPort: 5000
+        path: "/api/HttpTriggerAnon?name=bob"

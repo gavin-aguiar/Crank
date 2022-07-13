@@ -30,7 +30,6 @@ results: # creates results from measurements
 jobs:
   server:
     source:
-      #localFolder: D:\Repos\azure-functions-host\src\WebJobs.Script.WebHost
       repository: https://github.com/Azure/azure-functions-host
       branchOrCommit: dev
       project: src/WebJobs.Script.WebHost/WebJobs.Script.WebHost.csproj
@@ -42,10 +41,6 @@ jobs:
       AzureWebJobsScriptRoot: ../../../sample/CSharpBenchmark
     options:
       collectCounters: true
-      # counterProviders:
-      #   - System.Runtime
-      #   - Microsoft-AspNetCore-Server-Kestrel
-      #   - Microsoft.AspNetCore.Hosting
       displayBuild: true
       displayOutput: true
     buildArguments: 

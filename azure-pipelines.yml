@@ -1,0 +1,30 @@
+trigger: none
+
+schedules:
+- cron: "0 22 * * *"
+  displayName: "On :00"
+  branches:
+    include:
+    - main
+  always: "true" 
+
+
+jobs:
+- job: Benchmark
+  pool: server
+  timeoutInMinutes: 60
+  steps:
+ 
+  - task: PublishToAzureServiceBus@1
+    displayName: Benchmark
+    condition: succeededOrFailed()
+    timeoutInMinutes: 5
+    inputs:
+      connectedServiceName: AzFunc Performance
+      waitForCompletion: true
+      messageBody: |
+        {
+          "name": "crank",
+          "condition": "true",
+          "args": [ " --config https://raw.githubusercontent.com/gavin-aguiar/Crank/main/dotnet.yml --scenario functions-baseline --profile aspnet-perf-lin --chart" ]
+        }  
